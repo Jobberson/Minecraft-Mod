@@ -1,0 +1,5 @@
+{
+  "variants": {
+    "": { "model": "temporalengineering:block/temporal_field_generator" }
+  }
+}

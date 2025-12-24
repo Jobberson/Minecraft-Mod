@@ -1,0 +1,6 @@
+{
+  "parent": "block/cube_all",
+  "textures": {
+    "all": "temporalengineering:block/temporal_field_generator"
+  }
+}
