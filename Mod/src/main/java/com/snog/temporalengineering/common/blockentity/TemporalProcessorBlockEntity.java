@@ -6,6 +6,7 @@ import com.snog.temporalengineering.common.registry.ModBlockEntities;
 import com.snog.temporalengineering.common.config.TemporalConfig;
 import com.snog.temporalengineering.common.menu.TemporalProcessorMenu;
 import com.snog.temporalengineering.common.temporal.TemporalTime;
+import com.snog.temporalengineering.api.ITemporalStatusHud;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -40,7 +41,7 @@ import javax.annotation.Nullable;
 public class TemporalProcessorBlockEntity extends BlockEntity implements MenuProvider, ITemporalAffectable {
 
     // Heat
-    private int heat = 0;
+    private int heat    = 0;
     private int maxHeat = 100;
 
     // Fluids (water tank)
@@ -52,39 +53,82 @@ public class TemporalProcessorBlockEntity extends BlockEntity implements MenuPro
     private final LazyOptional<IItemHandler> itemHandlerCap = LazyOptional.of(() -> itemHandler);
 
     // Work system
-    public float workProgress = 0f;
-    public float workMultiplier = 1.0f;
+    public float workProgress           = 0f;
+    public float workMultiplier         = 1.0f;
     public int multiplierTicksRemaining = 0;
 
+    // hud 
+    private float hudRequestedMultiplier = 1.0f;
+    private float hudEffectiveMultiplier = 1.0f;
+    private int hudStatusBits            = 0;
+
+    // Status bit constants
+    private static final int STATUS_FIELD_ACTIVE    = 0x1;
+    private static final int STATUS_CAPPED          = 0x2;
+    private static final int STATUS_ADAPTER_APPLIED = 0x4
+
     // DATA SYNC
-    private final ContainerData data = new ContainerData() {
+    
+    private final ContainerData data = new ContainerData()
+    {
         @Override
-        public int get(int index) {
-            return switch (index) {
+        public int get(int index)
+        {
+            return switch (index)
+            {
                 case 0 -> heat;
                 case 1 -> tank.getFluidAmount();
                 case 2 -> Math.round(workProgress * 100.0f); // scaled to int for UI
+                case 3 -> Math.round(hudEffectiveMultiplier * 100.0f);
+                case 4 -> Math.round(hudRequestedMultiplier * 100.0f);
+                case 5 -> hudStatusBits;
                 default -> 0;
             };
         }
 
+        
         @Override
-        public void set(int index, int value) {
-            switch (index) {
+        public void set(int index, int value)
+        {
+            switch (index)
+            {
                 case 0 -> heat = value;
-                case 1 -> {
-                    if (value <= 0) tank.setFluid(FluidStack.EMPTY);
-                    else tank.setFluid(new FluidStack(net.minecraft.world.level.material.Fluids.WATER, value));
+                case 1 ->
+                {
+                    if (value <= 0) tank.setFluid(net.minecraftforge.fluids.FluidStack.EMPTY);
+                    else tank.setFluid(new net.minecraftforge.fluids.FluidStack(net.minecraft.world.level.material.Fluids.WATER, value));
                 }
                 case 2 -> workProgress = value / 100.0f;
+                case 3 -> hudEffectiveMultiplier = value / 100.0f;
+                case 4 -> hudRequestedMultiplier = value / 100.0f;
+                case 5 -> hudStatusBits = value;
             }
         }
 
         @Override
         public int getCount() {
-            return 3;
+            return 6;
         }
     };
+    
+    // ---- Optional HUD interface implementation ----
+    @Override
+    public void notifyTemporalEffect(float requested, float effective, int durationTicks, String source)
+    {
+        this.hudRequestedMultiplier = requested;
+        this.hudEffectiveMultiplier = effective;
+
+        int bits = 0;
+        if ("Field".equalsIgnoreCase(source)) bits |= STATUS_FIELD_ACTIVE;
+        if (effective + 1e-6f < requested)    bits |= STATUS_CAPPED;
+        if ("Adapter".equalsIgnoreCase(source)) bits |= STATUS_ADAPTER_APPLIED;
+
+        this.hudStatusBits = bits;
+
+        // also keep the gameplay multiplier behavior just like before:
+        applyTimeMultiplier(effective, durationTicks); // ensures timer + workMultiplier are set
+        setChanged();
+    }
 
     public TemporalProcessorBlockEntity(BlockPos pos, BlockState state) {
         super(ModBlockEntities.TEMPORAL_PROCESSOR.get(), pos, state);

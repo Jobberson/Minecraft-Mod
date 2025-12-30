@@ -5,7 +5,10 @@ import com.snog.temporalengineering.common.registry.ModBlockEntities;
 import com.snog.temporalengineering.common.registry.ModItems;
 import com.snog.temporalengineering.common.registry.ModMenuTypes;
 import com.snog.temporalengineering.common.config.TemporalConfig;
+import com.snog.temporalengineering.common.temporal.TemporalAdapters;
+import com.snog.temporalengineering.api.TemporalAdapterRegistry;
 
+import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
@@ -24,7 +27,8 @@ public class TemporalEngineering {
     public static final String MODID = "temporalengineering";
     public static final Logger LOGGER = LogManager.getLogger(MODID);
 
-    public TemporalEngineering() {
+    public TemporalEngineering()
+    {
         IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
 
         // register content
@@ -39,8 +43,21 @@ public class TemporalEngineering {
         // optional: listen for config reloads (modEventBus)
         modEventBus.addListener(this::onConfigReload);
 
+        // common setup: register adapters, then lock registry
+        modEventBus.addListener(this::onCommonSetup);
+
         // forge bus for runtime events
         MinecraftForge.EVENT_BUS.register(this);
+    }
+
+    private void onCommonSetup(final FMLCommonSetupEvent event)
+    {
+        event.enqueueWork(() ->
+        {
+            TemporalAdapters.register();
+            TemporalAdapterRegistry.lock();
+            TemporalEngineering.LOGGER.info("Temporal adapters registered and registry locked.");
+        });
     }
 
     private void onConfigReload(final ModConfigEvent.Reloading evt) {

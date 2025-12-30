@@ -69,7 +69,6 @@ public class TemporalFieldGeneratorBlockEntity extends BlockEntity {
 
     private static void applySpeedToNearby(Level level, BlockPos center, int radius, float speed, int duration){
         int r = Math.max(0, radius);
-
         for (int dx = -r; dx <= r; dx++) {
             for (int dy = -r; dy <= r; dy++) {
                 for (int dz = -r; dz <= r; dz++) {
@@ -80,7 +79,8 @@ public class TemporalFieldGeneratorBlockEntity extends BlockEntity {
                     if (be == null) continue;
 
                     // Centralized application via registry (covers native + adapters)
-                    TemporalAdapterRegistry.tryApply(be, speed, duration);
+                    // Explicit source = "Field" for HUD clarity
+                    TemporalAdapterRegistry.tryApplyWithSource(be, speed, duration, "Field");
                 }
             }
         }

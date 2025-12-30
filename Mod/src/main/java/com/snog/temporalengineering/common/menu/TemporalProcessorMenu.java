@@ -1,9 +1,10 @@
 package com.snog.temporalengineering.common.menu;
+
 import com.snog.temporalengineering.common.blockentity.TemporalProcessorBlockEntity;
 import com.snog.temporalengineering.common.registry.ModBlockEntities;
 import com.snog.temporalengineering.common.registry.ModMenuTypes;
-import java.util.Objects;
 
+import java.util.Objects;
 import javax.annotation.Nonnull;
 
 import net.minecraft.network.FriendlyByteBuf;
@@ -13,6 +14,7 @@ import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ContainerData;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
+
 import net.minecraftforge.items.IItemHandler;
 import net.minecraftforge.items.SlotItemHandler;
 
@@ -82,7 +84,18 @@ public class TemporalProcessorMenu extends AbstractContainerMenu {
 
     @Override
     public boolean stillValid(Player player) {
-        return true;
+        if (this.blockEntity == null || player == null) return false;
+            final var level = this.blockEntity.getLevel();
+            if (level == null) return false;
+
+            final var pos = this.blockEntity.getBlockPos();
+            // 8 blocks radius (64 squared), matches vanilla containers
+            boolean inRange = player.distanceToSqr(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5) <= 64.0;
+
+            // Ensure the block is still our processor
+            boolean isSameBlock = level.getBlockState(pos).is(com.snog.temporalengineering.common.registry.ModBlocks.TEMPORAL_PROCESSOR.get());
+
+            return inRange && isSameBlock;
     }
 
     /**
@@ -148,5 +161,38 @@ public class TemporalProcessorMenu extends AbstractContainerMenu {
 
     public int getMaxWater() {
         return 1000; // matches your FluidTank capacity; or route to config if you have one
+    }
+     
+    public int getMultiplierEffectiveX100()
+    {
+        try { return this.data.get(3); } catch (Exception ignored) {}
+        return Math.round((this.blockEntity != null ? this.blockEntity.workMultiplier : 1.0f) * 100f);
+    }
+
+    public int getMultiplierRequestedX100()
+    {
+        try { return this.data.get(4); } catch (Exception ignored) {}
+        return Math.round(100f); // fallback = 1.0x requested
+    }
+
+    public int getStatusBits()
+    {
+        try { return this.data.get(5); } catch (Exception ignored) {}
+        return 0;
+    }
+
+    public boolean isFieldActive()
+    {
+        return (getStatusBits() & 0x1) != 0;
+    }
+
+    public boolean isCappedByConfig()
+    {
+        return (getStatusBits() & 0x2) != 0;
+    }
+
+    public boolean isAdapterApplied()
+    {
+        return (getStatusBits() & 0x4) != 0;
     }
 }
