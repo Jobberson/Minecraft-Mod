@@ -1,24 +1,62 @@
-# Compiled class file
+# Language/Build
 *.class
-
-# Log file
 *.log
+*.tmp
+*.swp
+*.swo
+*.orig
 
-# BlueJ files
-*.ctxt
+# OS/File system noise
+.DS_Store
+Thumbs.db
+desktop.ini
 
-# Mobile Tools for Java (J2ME)
-.mtj.tmp/
+# Gradle build output
+/build/
+/out/
+/.gradle/
 
-# Package Files #
+# Forge run dirs (user/dev environment)
+/run/
+/runClient/
+/runServer/
+
+# IntelliJ IDEA
+/.idea/
+*.iml
+/*.ipr
+/*.iws
+
+# VS Code (keep only intentional shared configs)
+/.vscode/
+
+# Eclipse
+/.classpath
+/.project
+/.settings/
+
+# Minecraft runtime
+/crash-reports/
+/logs/
+/saves/
+
+# Generated artifacts
 *.jar
 *.war
-*.nar
-*.ear
 *.zip
+*.tar
 *.tar.gz
-*.rar
 
-# virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
-hs_err_pid*
-replay_pid*
+# Java toolchains (optional caches)
+/.tooling/
+
+# Test reports (if you add tests)
+/test-results/
+/reports/
+
+# Asset pipeline caches (if using external tools)
+/.cache/
+
+# Local environment overrides
+*.local
+.env
