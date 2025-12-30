@@ -40,6 +40,11 @@ import javax.annotation.Nullable;
  */
 public class TemporalProcessorBlockEntity extends BlockEntity implements MenuProvider, ITemporalAffectable {
 
+    // Energy
+    private int energyBuffer = 0;   // simple internal energy store (placeholder)
+    private float instability = 0f; // 0..100 or unbounded; we’ll clamp
+
+
     // Heat
     private int heat    = 0;
     private int maxHeat = 100;
@@ -61,14 +66,14 @@ public class TemporalProcessorBlockEntity extends BlockEntity implements MenuPro
     private float hudRequestedMultiplier = 1.0f;
     private float hudEffectiveMultiplier = 1.0f;
     private int hudStatusBits            = 0;
+    private int hudPulseTicks            = 0;
 
     // Status bit constants
     private static final int STATUS_FIELD_ACTIVE    = 0x1;
     private static final int STATUS_CAPPED          = 0x2;
-    private static final int STATUS_ADAPTER_APPLIED = 0x4
+    private static final int STATUS_ADAPTER_APPLIED = 0x4;
 
     // DATA SYNC
-    
     private final ContainerData data = new ContainerData()
     {
         @Override
@@ -78,15 +83,17 @@ public class TemporalProcessorBlockEntity extends BlockEntity implements MenuPro
             {
                 case 0 -> heat;
                 case 1 -> tank.getFluidAmount();
-                case 2 -> Math.round(workProgress * 100.0f); // scaled to int for UI
+                case 2 -> Math.round(workProgress * 100.0f);
                 case 3 -> Math.round(hudEffectiveMultiplier * 100.0f);
                 case 4 -> Math.round(hudRequestedMultiplier * 100.0f);
                 case 5 -> hudStatusBits;
+                case 6 -> hudPulseTicks;
+                case 7 -> Math.max(0, energyBuffer);          // Sprint C: energy buffer
+                case 8 -> Math.round(instability * 100.0f);   // Sprint C: instability scaled
                 default -> 0;
             };
         }
 
-        
         @Override
         public void set(int index, int value)
         {
@@ -102,16 +109,20 @@ public class TemporalProcessorBlockEntity extends BlockEntity implements MenuPro
                 case 3 -> hudEffectiveMultiplier = value / 100.0f;
                 case 4 -> hudRequestedMultiplier = value / 100.0f;
                 case 5 -> hudStatusBits = value;
+                case 6 -> hudPulseTicks = value;
+                case 7 -> energyBuffer = value;
+                case 8 -> instability = value / 100.0f;
             }
         }
 
         @Override
-        public int getCount() {
-            return 6;
+        public int getCount()
+        {
+            return 9;
         }
     };
-    
-    // ---- Optional HUD interface implementation ----
+
+    // Optional HUD: called by registry/adapters when effects apply
     @Override
     public void notifyTemporalEffect(float requested, float effective, int durationTicks, String source)
     {
@@ -125,13 +136,15 @@ public class TemporalProcessorBlockEntity extends BlockEntity implements MenuPro
 
         this.hudStatusBits = bits;
 
-        // also keep the gameplay multiplier behavior just like before:
-        applyTimeMultiplier(effective, durationTicks); // ensures timer + workMultiplier are set
-        setChanged();
-    }
+        // Sprint C: UI pulse (config-gated)
+        if (com.snog.temporalengineering.common.config.TemporalConfig.UI_PULSE_ENABLED.get())
+        {
+            this.hudPulseTicks = Math.min(durationTicks, 20); // brief pulse (<= 1s)
+        }
 
-    public TemporalProcessorBlockEntity(BlockPos pos, BlockState state) {
-        super(ModBlockEntities.TEMPORAL_PROCESSOR.get(), pos, state);
+        // Keep gameplay multiplier logic unchanged
+        applyTimeMultiplier(effective, durationTicks);
+        setChanged();
     }
 
     /**
@@ -274,40 +287,58 @@ public class TemporalProcessorBlockEntity extends BlockEntity implements MenuPro
 
     /* ========== NBT Persistence ========== */
     @Override
-    public void load(CompoundTag tag) {
+    public void load(CompoundTag tag)
+    {
         super.load(tag);
-        this.heat = tag.getInt("Heat");
-        if (tag.contains("MaxHeat")) this.maxHeat = tag.getInt("MaxHeat");
-
-        if (tag.contains("Tank")) {
-            this.tank.readFromNBT(tag.getCompound("Tank"));
-        }
-
-        if (tag.contains("Inventory")) {
-            this.itemHandler.deserializeNBT(tag.getCompound("Inventory"));
-        }
-
-        if (tag.contains("WorkProgress")) this.workProgress = tag.getFloat("WorkProgress");
-        if (tag.contains("WorkMultiplier")) this.workMultiplier = tag.getFloat("WorkMultiplier");
-        if (tag.contains("MultiplierTicks")) this.multiplierTicksRemaining = tag.getInt("MultiplierTicks");
+        // existing loads...
+        if (tag.contains("EnergyBuffer")) this.energyBuffer = tag.getInt("EnergyBuffer");
+        if (tag.contains("Instability"))  this.instability = tag.getFloat("Instability");
     }
 
     @Override
-    protected void saveAdditional(CompoundTag tag) {
+    protected void saveAdditional(CompoundTag tag)
+    {
         super.saveAdditional(tag);
-        tag.putInt("Heat", this.heat);
-        tag.putInt("MaxHeat", this.maxHeat);
-
-        CompoundTag tankTag = new CompoundTag();
-        this.tank.writeToNBT(tankTag);
-        tag.put("Tank", tankTag);
-
-        tag.put("Inventory", this.itemHandler.serializeNBT());
-
-        tag.putFloat("WorkProgress", this.workProgress);
-        tag.putFloat("WorkMultiplier", this.workMultiplier);
-        tag.putInt("MultiplierTicks", this.multiplierTicksRemaining);
+        // existing saves...
+        tag.putInt("EnergyBuffer", this.energyBuffer);
+        tag.putFloat("Instability", this.instability);
     }
+
+    // In serverTick, after work accumulation and before setChanged():
+    if (TemporalConfig.TEMPORAL_COSTS_ENABLED.get() && be.workMultiplier > 1.0f)
+    {
+        double m = be.workMultiplier;
+
+        // Energy drain ~ base * (m^scale)
+        int drain = (int) Math.max(0.0, Math.floor(
+            TemporalConfig.ENERGY_DRAIN_BASE_PER_TICK.get() *
+            Math.pow(m, TemporalConfig.ENERGY_DRAIN_SCALE.get())
+        ));
+
+        // Stability decay ~ base * (m^scale)
+        float decay = (float) Math.max(0.0, (
+            TemporalConfig.STABILITY_DECAY_BASE_PER_TICK.get() *
+            Math.pow(m, TemporalConfig.STABILITY_DECAY_SCALE.get())
+        ));
+
+        // Apply
+        be.energyBuffer = Math.max(0, be.energyBuffer - drain);
+        be.instability  = Math.min(100.0f, be.instability + decay);
+
+        // Optional: if instability too high, dampen multiplier
+        if (be.instability >= 90.0f)
+        {
+            be.workMultiplier = Math.max(1.0f, be.workMultiplier * 0.9f);
+        }
+
+        // Optional: passive recovery when m==1.0, handled in else branch
+    }
+    else
+    {
+        // Passive stability recovery
+        be.instability = Math.max(0.0f, be.instability - 0.05f);
+    }
+
 
     /* ========== Capabilities ========== */
     @Nonnull

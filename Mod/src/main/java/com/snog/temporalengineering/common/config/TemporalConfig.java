@@ -21,6 +21,16 @@ public class TemporalConfig
 
     public static final ForgeConfigSpec.IntValue EM_THRESHOLD;
 
+    public static final ForgeConfigSpec.BooleanValue UI_PULSE_ENABLED;
+    public static final ForgeConfigSpec.BooleanValue FX_GENERATOR_PARTICLES_ENABLED;
+    public static final ForgeConfigSpec.BooleanValue FX_GENERATOR_SOUND_ENABLED;
+
+    public static final ForgeConfigSpec.BooleanValue TEMPORAL_COSTS_ENABLED;
+    public static final ForgeConfigSpec.DoubleValue ENERGY_DRAIN_BASE_PER_TICK;
+    public static final ForgeConfigSpec.DoubleValue ENERGY_DRAIN_SCALE;
+    public static final ForgeConfigSpec.DoubleValue STABILITY_DECAY_BASE_PER_TICK;
+    public static final ForgeConfigSpec.DoubleValue STABILITY_DECAY_SCALE;
+
     // --- Adapters section ---
     public static final ForgeConfigSpec.BooleanValue ADAPTERS_ENABLED;
     public static final ForgeConfigSpec.DoubleValue NON_NATIVE_MAX_MULTIPLIER;
@@ -70,6 +80,30 @@ public class TemporalConfig
 
         EM_THRESHOLD = b.comment("Heat threshold where processor begins producing")
             .defineInRange("emHeatThreshold", 80, 0, 10000);
+
+        // --- temporal costs subsection ---
+        b.push("temporal_costs");
+        TEMPORAL_COSTS_ENABLED = b.comment("Enable energy/stability costs tied to multiplier")
+            .define("enabled", true);
+        ENERGY_DRAIN_BASE_PER_TICK = b.comment("Base energy drain per tick when multiplier > 1")
+            .defineInRange("energy_drain_base_per_tick", 2.0, 0.0, 1_000_000.0);
+        ENERGY_DRAIN_SCALE = b.comment("Non-linear scale applied to multiplier (e.g., 2.0 for quadratic)")
+            .defineInRange("energy_drain_scale", 2.0, 0.0, 10.0);
+        STABILITY_DECAY_BASE_PER_TICK = b.comment("Base stability decay per tick when multiplier > 1")
+            .defineInRange("stability_decay_base_per_tick", 0.5, 0.0, 1_000_000.0);
+        STABILITY_DECAY_SCALE = b.comment("Scale applied to multiplier for instability growth")
+            .defineInRange("stability_decay_scale", 1.5, 0.0, 10.0);
+        b.pop();
+
+        // --- effects subsection ---
+        b.push("ui");
+        UI_PULSE_ENABLED = b.define("pulse_enabled", true);
+        b.pop();
+    
+        b.push("fx");
+        FX_GENERATOR_PARTICLES_ENABLED = b.define("generator_particles_enabled", true);
+        FX_GENERATOR_SOUND_ENABLED = b.define("generator_sound_enabled", true);
+        b.pop();
 
         // --- adapters subsection ---
         b.push("adapters");

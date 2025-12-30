@@ -13,6 +13,9 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.core.particles.ParticleTypes;
 
 import net.minecraftforge.common.util.LazyOptional;
 import net.minecraftforge.items.ItemStackHandler;
@@ -46,8 +49,9 @@ public class TemporalFieldGeneratorBlockEntity extends BlockEntity {
         super(ModBlockEntities.TEMPORAL_FIELD_GENERATOR.get(), pos, state);
     }
 
-    public static void serverTick(Level level, BlockPos pos, BlockState state,
-                                  TemporalFieldGeneratorBlockEntity be) {
+    private static void serverTick(Level level, BlockPos pos, BlockState state,
+        TemporalFieldGeneratorBlockEntity be)
+    {
         if (level.isClientSide) return;
 
         int consumeInterval = TemporalConfig.GENERATOR_CONSUME_INTERVAL_TICKS.get();
@@ -55,15 +59,42 @@ public class TemporalFieldGeneratorBlockEntity extends BlockEntity {
         if (level.getGameTime() % consumeInterval != 0) return;
 
         ItemStack stack = be.itemHandler.getStackInSlot(0);
-        if (!stack.isEmpty() && stack.getItem() == ModItems.VOLATILE_EXOTIC_MATTER.get()) {
+        if (!stack.isEmpty() && stack.getItem() == ModItems.VOLATILE_EXOTIC_MATTER.get())
+        {
             ItemStack extracted = be.itemHandler.extractItem(0, 1, false);
-            if (!extracted.isEmpty()) {
+            if (!extracted.isEmpty())
+            {
                 int radius = TemporalConfig.FIELD_RADIUS.get();
                 float speed = TemporalConfig.GENERATOR_SPEED_MULTIPLIER.get().floatValue();
                 int duration = TemporalConfig.GENERATOR_EFFECT_DURATION_TICKS.get();
+
                 applySpeedToNearby(level, pos, radius, speed, duration);
+
+                // ---- Sprint C: FX pulse (config-gated) ----
+                if (TemporalConfig.FX_GENERATOR_PARTICLES_ENABLED.get())
+                {
+                    spawnFieldPulseParticles(level, pos, radius);
+                }
+                if (TemporalConfig.FX_GENERATOR_SOUND_ENABLED.get())
+                {
+                    level.playSound(null, pos, SoundEvents.AMETHYST_BLOCK_CHIME, SoundSource.BLOCKS, 0.6f, 1.2f);
+                }
+
                 be.setChanged();
             }
+        }
+    }
+
+    private static void spawnFieldPulseParticles(Level level, BlockPos pos, int radius)
+    {
+        // A small ring of particles around the generator; server-side broadcast
+        for (int i = 0; i < 16; i++)
+        {
+            double ox = pos.getX() + 0.5 + (level.random.nextDouble() - 0.5) * (radius / 2.0);
+            double oy = pos.getY() + 1.0 + level.random.nextDouble() * 0.25;
+            double oz = pos.getZ() + 0.5 + (level.random.nextDouble() - 0.5) * (radius / 2.0);
+
+            level.addParticle(ParticleTypes.ELECTRIC_SPARK, ox, oy, oz, 0.0, 0.02, 0.0);
         }
     }
 
