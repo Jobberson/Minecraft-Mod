@@ -130,8 +130,11 @@ public class TemporalProcessorBlockEntity extends BlockEntity implements MenuPro
         this.hudEffectiveMultiplier = effective;
 
         int bits = 0;
+
         if ("Field".equalsIgnoreCase(source)) bits |= STATUS_FIELD_ACTIVE;
+
         if (effective + 1e-6f < requested)    bits |= STATUS_CAPPED;
+        
         if ("Adapter".equalsIgnoreCase(source)) bits |= STATUS_ADAPTER_APPLIED;
 
         this.hudStatusBits = bits;
@@ -143,7 +146,6 @@ public class TemporalProcessorBlockEntity extends BlockEntity implements MenuPro
         }
 
         // Keep gameplay multiplier logic unchanged
-        applyTimeMultiplier(effective, durationTicks);
         setChanged();
     }
 
