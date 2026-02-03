@@ -77,22 +77,36 @@ public final class TemporalAdapterRegistry
      */
     public static boolean tryApplyWithSource(BlockEntity be, float multiplier, int durationTicks, String source)
     {
-        if (be == null) return false;
+        
+        if (be == null)
+        {
+            return false;
+        }
 
-        // Centralized cap enforcement
+        if (durationTicks <= 0)
+        {
+            return false;
+        }
+
         float effective = TemporalTime.computeEffectiveMultiplier(be, multiplier);
 
-        // 1) Native support
+        // 1) Native support: ALWAYS allowed
         if (be instanceof ITemporalAffectable affectable)
         {
             affectable.applyTimeMultiplier(effective, durationTicks);
 
-            // Optional HUD feedback
             if (be instanceof ITemporalStatusHud hud)
             {
                 hud.notifyTemporalEffect(multiplier, effective, durationTicks, source);
             }
+
             return true;
+        }
+
+        // 2) Non-native support: ONLY if adapters enabled
+        if (!com.snog.temporalengineering.common.config.TemporalConfig.ADAPTERS_ENABLED.get())
+        {
+            return false;
         }
 
         // 2) Adapter lookup with priorities + conflict detection
