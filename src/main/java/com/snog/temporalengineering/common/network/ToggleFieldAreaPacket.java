@@ -26,9 +26,7 @@ public final class ToggleFieldAreaPacket
 
     public static ToggleFieldAreaPacket decode(FriendlyByteBuf buf)
     {
-        BlockPos pos = buf.readBlockPos();
-        boolean show = buf.readBoolean();
-        return new ToggleFieldAreaPacket(pos, show);
+        return new ToggleFieldAreaPacket(buf.readBlockPos(), buf.readBoolean());
     }
 
     public static void handle(ToggleFieldAreaPacket msg, Supplier<NetworkEvent.Context> ctx)
@@ -50,7 +48,6 @@ public final class ToggleFieldAreaPacket
             var be = level.getBlockEntity(msg.pos);
             if (be instanceof TemporalFieldGeneratorBlockEntity gen)
             {
-                // Optional distance check (recommended)
                 double distSqr = sender.distanceToSqr(
                     msg.pos.getX() + 0.5,
                     msg.pos.getY() + 0.5,
@@ -67,4 +64,3 @@ public final class ToggleFieldAreaPacket
         ctx.get().setPacketHandled(true);
     }
 }
-``

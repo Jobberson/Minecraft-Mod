@@ -1,39 +1,41 @@
 package com.snog.temporalengineering.client;
 
 import com.snog.temporalengineering.TemporalEngineering;
-import com.snog.temporalengineering.common.registry.ModMenuTypes;
+import com.snog.temporalengineering.client.render.TemporalFieldGeneratorRenderer;
 import com.snog.temporalengineering.client.screen.TemporalFieldGeneratorScreen;
-
-import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.fml.common.Mod.EventBusSubscriber;
-import net.minecraftforge.api.distmarker.OnlyIn;
-import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
-import net.minecraftforge.fml.common.Mod.EventBusSubscriber.Bus;
 import com.snog.temporalengineering.client.screen.TemporalProcessorScreen;
-
+import com.snog.temporalengineering.common.registry.ModBlockEntities;
+import com.snog.temporalengineering.common.registry.ModMenuTypes;
 import net.minecraft.client.gui.screens.MenuScreens;
+import net.minecraft.client.renderer.blockentity.BlockEntityRenderers;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.common.Mod.EventBusSubscriber;
+import net.minecraftforge.fml.common.Mod.EventBusSubscriber.Bus;
+import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
 
 @EventBusSubscriber(modid = TemporalEngineering.MODID, bus = Bus.MOD, value = Dist.CLIENT)
-public class ClientSetup {
+public class ClientSetup
+{
     @SubscribeEvent
-    public static void onClientSetup(FMLClientSetupEvent event) {
-        MenuScreens.register(
-            ModMenuTypes.TEMPORAL_PROCESSOR_MENU.get(),
-            TemporalProcessorScreen::new
-        );
+    public static void onClientSetup(FMLClientSetupEvent event)
+    {
+        event.enqueueWork(() ->
+        {
+            MenuScreens.register(
+                ModMenuTypes.TEMPORAL_PROCESSOR_MENU.get(),
+                TemporalProcessorScreen::new
+            );
 
-        MenuScreens.register(
-            ModMenuTypes.TEMPORAL_FIELD_GENERATOR_MENU.get(),
-            TemporalFieldGeneratorScreen::new
-        );
+            MenuScreens.register(
+                ModMenuTypes.TEMPORAL_FIELD_GENERATOR_MENU.get(),
+                TemporalFieldGeneratorScreen::new
+            );
 
-        net.minecraft.client.renderer.blockentity.BlockEntityRenderers.register(
-            com.snog.temporalengineering.common.registry.ModBlockEntities.TEMPORAL_FIELD_GENERATOR.get(),
-            com.snog.temporalengineering.client.render.TemporalFieldGeneratorRenderer::new
-        );
+            BlockEntityRenderers.register(
+                ModBlockEntities.TEMPORAL_FIELD_GENERATOR.get(),
+                TemporalFieldGeneratorRenderer::new
+            );
+        });
     }
 }

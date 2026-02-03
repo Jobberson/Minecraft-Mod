@@ -24,6 +24,7 @@ public class TemporalFieldGeneratorRenderer implements BlockEntityRenderer<Tempo
             return;
         }
 
+        // Only render when the player enabled it via the generator UI toggle.
         if (!be.getShowArea())
         {
             return;
@@ -35,113 +36,92 @@ public class TemporalFieldGeneratorRenderer implements BlockEntityRenderer<Tempo
             return;
         }
 
-        // Distance LOD
+        // Optional: distance cull for performance (very cheap and helpful)
         Vec3 cam = mc.player.position();
         double dx = (be.getBlockPos().getX() + 0.5) - cam.x;
         double dy = (be.getBlockPos().getY() + 0.5) - cam.y;
         double dz = (be.getBlockPos().getZ() + 0.5) - cam.z;
         double distSqr = dx * dx + dy * dy + dz * dz;
 
-        int segments = 12;
-        if (distSqr < 12.0 * 12.0)
+        // If the player is very far, don't bother rendering the outline.
+        // Tune this as you like.
+        double maxDist = 96.0;
+        if (distSqr > maxDist * maxDist)
         {
-            segments = 32;
-        }
-        else if (distSqr < 24.0 * 24.0)
-        {
-            segments = 24;
-        }
-        else if (distSqr < 48.0 * 48.0)
-        {
-            segments = 16;
+            return;
         }
 
-        float radius = TemporalConfig.FIELD_RADIUS.get();
-        if (radius <= 0.0f)
+        int radius = TemporalConfig.FIELD_RADIUS.get();
+        int r = Math.max(0, radius);
+
+        if (r == 0)
         {
             return;
         }
 
         // Color: subtle blue, faint alpha
-        float r = 0.25f;
-        float g = 0.65f;
-        float b = 1.00f;
-        float a = 0.18f;
+        float cr = 0.25f;
+        float cg = 0.65f;
+        float cb = 1.00f;
+        float ca = 0.18f;
 
+        // RenderType.lines() is depth-tested, so the outline will be occluded by blocks.
         var consumer = buffer.getBuffer(RenderType.lines());
 
         poseStack.pushPose();
+
+        // The BE renderer origin is the block's corner. We want the cube centered on the block center,
+        // because your gameplay loop is symmetric around the generator's block position.
         poseStack.translate(0.5, 0.5, 0.5);
 
-        // Three great circles: XZ, XY, YZ
-        drawCircleXZ(poseStack, consumer, radius, segments, r, g, b, a);
-        drawCircleXY(poseStack, consumer, radius, segments, r, g, b, a);
-        drawCircleYZ(poseStack, consumer, radius, segments, r, g, b, a);
+        // Gameplay applies to all offsets dx/dy/dz in [-r..r]. That affects a cube of blocks.
+        // To draw a boundary around the *outer faces* of those blocks, use min=-r and max= r+1.
+        float min = -r;
+        float max = r + 1;
+
+        // Slight expansion reduces z-fighting when lines overlap block faces.
+        float eps = 0.002f;
+        min -= eps;
+        max += eps;
+
+        drawWireCube(poseStack, consumer, min, min, min, max, max, max, cr, cg, cb, ca);
 
         poseStack.popPose();
     }
 
-    private void drawCircleXZ(PoseStack poseStack, com.mojang.blaze3d.vertex.VertexConsumer consumer, float radius, int segments, float r, float g, float b, float a)
+    private void drawWireCube(PoseStack poseStack, com.mojang.blaze3d.vertex.VertexConsumer consumer,
+                              float minX, float minY, float minZ,
+                              float maxX, float maxY, float maxZ,
+                              float r, float g, float b, float a)
     {
-        float step = (float) (Math.PI * 2.0 / segments);
+        // Bottom rectangle (Y = minY)
+        line(poseStack, consumer, minX, minY, minZ, maxX, minY, minZ, r, g, b, a);
+        line(poseStack, consumer, maxX, minY, minZ, maxX, minY, maxZ, r, g, b, a);
+        line(poseStack, consumer, maxX, minY, maxZ, minX, minY, maxZ, r, g, b, a);
+        line(poseStack, consumer, minX, minY, maxZ, minX, minY, minZ, r, g, b, a);
 
-        for (int i = 0; i < segments; i++)
-        {
-            float a0 = i * step;
-            float a1 = (i + 1) * step;
+        // Top rectangle (Y = maxY)
+        line(poseStack, consumer, minX, maxY, minZ, maxX, maxY, minZ, r, g, b, a);
+        line(poseStack, consumer, maxX, maxY, minZ, maxX, maxY, maxZ, r, g, b, a);
+        line(poseStack, consumer, maxX, maxY, maxZ, minX, maxY, maxZ, r, g, b, a);
+        line(poseStack, consumer, minX, maxY, maxZ, minX, maxY, minZ, r, g, b, a);
 
-            float x0 = (float) Math.cos(a0) * radius;
-            float z0 = (float) Math.sin(a0) * radius;
-            float x1 = (float) Math.cos(a1) * radius;
-            float z1 = (float) Math.sin(a1) * radius;
-
-            line(poseStack, consumer, x0, 0.0f, z0, x1, 0.0f, z1, r, g, b, a);
-        }
-    }
-
-    private void drawCircleXY(PoseStack poseStack, com.mojang.blaze3d.vertex.VertexConsumer consumer, float radius, int segments, float r, float g, float b, float a)
-    {
-        float step = (float) (Math.PI * 2.0 / segments);
-
-        for (int i = 0; i < segments; i++)
-        {
-            float a0 = i * step;
-            float a1 = (i + 1) * step;
-
-            float x0 = (float) Math.cos(a0) * radius;
-            float y0 = (float) Math.sin(a0) * radius;
-            float x1 = (float) Math.cos(a1) * radius;
-            float y1 = (float) Math.sin(a1) * radius;
-
-            line(poseStack, consumer, x0, y0, 0.0f, x1, y1, 0.0f, r, g, b, a);
-        }
-    }
-
-    private void drawCircleYZ(PoseStack poseStack, com.mojang.blaze3d.vertex.VertexConsumer consumer, float radius, int segments, float r, float g, float b, float a)
-    {
-        float step = (float) (Math.PI * 2.0 / segments);
-
-        for (int i = 0; i < segments; i++)
-        {
-            float a0 = i * step;
-            float a1 = (i + 1) * step;
-
-            float y0 = (float) Math.cos(a0) * radius;
-            float z0 = (float) Math.sin(a0) * radius;
-            float y1 = (float) Math.cos(a1) * radius;
-            float z1 = (float) Math.sin(a1) * radius;
-
-            line(poseStack, consumer, 0.0f, y0, z0, 0.0f, y1, z1, r, g, b, a);
-        }
+        // Vertical edges
+        line(poseStack, consumer, minX, minY, minZ, minX, maxY, minZ, r, g, b, a);
+        line(poseStack, consumer, maxX, minY, minZ, maxX, maxY, minZ, r, g, b, a);
+        line(poseStack, consumer, maxX, minY, maxZ, maxX, maxY, maxZ, r, g, b, a);
+        line(poseStack, consumer, minX, minY, maxZ, minX, maxY, maxZ, r, g, b, a);
     }
 
     private void line(PoseStack poseStack, com.mojang.blaze3d.vertex.VertexConsumer consumer,
-                      float x0, float y0, float z0, float x1, float y1, float z1,
+                      float x0, float y0, float z0,
+                      float x1, float y1, float z1,
                       float r, float g, float b, float a)
     {
         var pose = poseStack.last().pose();
         var normal = poseStack.last().normal();
 
+        // Note: Normal isn't super meaningful for lines, but Forge expects it.
         consumer.vertex(pose, x0, y0, z0).color(r, g, b, a).normal(normal, 0.0f, 1.0f, 0.0f).endVertex();
         consumer.vertex(pose, x1, y1, z1).color(r, g, b, a).normal(normal, 0.0f, 1.0f, 0.0f).endVertex();
     }
